@@ -13,6 +13,51 @@ import { requestConsentReconfirmation } from '../services/dailyDigest.js';
 
 const router = Router();
 
+/**
+ * @swagger
+ * /locations:
+ *   post:
+ *     summary: Ingest a new location ping from the tracker
+ *     tags: [Locations]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - session_id
+ *               - latitude
+ *               - longitude
+ *             properties:
+ *               session_id:
+ *                 type: string
+ *               latitude:
+ *                 type: number
+ *               longitude:
+ *                 type: number
+ *               accuracy_m:
+ *                 type: number
+ *               location_source:
+ *                 type: string
+ *               battery_level:
+ *                 type: integer
+ *               battery_charging:
+ *                 type: boolean
+ *               network_type:
+ *                 type: string
+ *               is_online:
+ *                 type: boolean
+ *               timezone:
+ *                 type: string
+ *               speed_ms:
+ *                 type: number
+ *     responses:
+ *       200:
+ *         description: Location recorded successfully
+ *       404:
+ *         description: No active session
+ */
 router.post('/', rateLimit({ windowMs: 10_000, max: 30, name: 'locations' }), validateBody(locationSchema), async (req: Request, res: Response) => {
   try {
     const { session_id, latitude, longitude, accuracy_m, location_source, battery_level, battery_charging, network_type, is_online, timezone, screen_width, screen_height, ip_city, ip_country, speed_ms } = req.body;
@@ -65,6 +110,24 @@ router.post('/', rateLimit({ windowMs: 10_000, max: 30, name: 'locations' }), va
   }
 });
 
+/**
+ * @swagger
+ * /locations/latest/{childId}:
+ *   get:
+ *     summary: Get the latest location for a child
+ *     tags: [Locations]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: childId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Latest location object
+ */
 router.get('/latest/:childId', async (req: Request, res: Response) => {
   try {
     const result = await query(
@@ -86,6 +149,29 @@ router.get('/latest/:childId', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * @swagger
+ * /locations/history/{childId}:
+ *   get:
+ *     summary: Get recent location history for a child
+ *     tags: [Locations]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: childId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Number of records to fetch
+ *     responses:
+ *       200:
+ *         description: List of historical locations
+ */
 router.get('/history/:childId', async (req: Request, res: Response) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);

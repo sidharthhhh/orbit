@@ -8,6 +8,38 @@ import { registerSchema, loginSchema } from '../utils/schemas.js';
 
 const router = Router();
 
+/**
+ * @swagger
+ * /auth/register:
+ *   post:
+ *     summary: Register a new user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *               - role
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *               role:
+ *                 type: string
+ *                 enum: [parent, guardian]
+ *               display_name:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Successfully registered
+ *       409:
+ *         description: Email already registered
+ */
 router.post('/register', rateLimit({ windowMs: 60_000, max: 5, name: 'register' }), validateBody(registerSchema), async (req: Request, res: Response) => {
   try {
     const { email, password, role, display_name } = req.body;
@@ -35,6 +67,32 @@ router.post('/register', rateLimit({ windowMs: 60_000, max: 5, name: 'register' 
   }
 });
 
+/**
+ * @swagger
+ * /auth/login:
+ *   post:
+ *     summary: Login an existing user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Successfully logged in
+ *       401:
+ *         description: Invalid credentials
+ */
 router.post('/login', rateLimit({ windowMs: 60_000, max: 10, name: 'login' }), validateBody(loginSchema), async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
@@ -61,11 +119,35 @@ router.post('/login', rateLimit({ windowMs: 60_000, max: 10, name: 'login' }), v
   }
 });
 
+/**
+ * @swagger
+ * /auth/logout:
+ *   post:
+ *     summary: Logout user
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Successfully logged out
+ */
 router.post('/logout', (_req: Request, res: Response) => {
   res.clearCookie('token');
   res.json({ ok: true });
 });
 
+/**
+ * @swagger
+ * /auth/me:
+ *   get:
+ *     summary: Get current authenticated user
+ *     tags: [Auth]
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Authenticated user details
+ *       401:
+ *         description: Not authenticated
+ */
 router.get('/me', requireAuth, (req: Request, res: Response) => {
   res.json({ user: req.user });
 });

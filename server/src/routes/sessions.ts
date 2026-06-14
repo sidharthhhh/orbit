@@ -7,6 +7,34 @@ import { getSocketIO } from '../socket/index.js';
 
 const router = Router();
 
+/**
+ * @swagger
+ * /sessions/start:
+ *   post:
+ *     summary: Start a new tracking session for a child
+ *     tags: [Sessions]
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - child_id
+ *               - started_by
+ *             properties:
+ *               child_id:
+ *                 type: integer
+ *               started_by:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Session started successfully
+ *       404:
+ *         description: Child not found
+ */
 router.post('/start', requireAuth, validateBody(startSessionSchema), async (req: Request, res: Response) => {
   try {
     const { child_id, started_by } = req.body;
@@ -49,6 +77,34 @@ router.post('/start', requireAuth, validateBody(startSessionSchema), async (req:
   }
 });
 
+/**
+ * @swagger
+ * /sessions/pause:
+ *   post:
+ *     summary: Pause an active tracking session
+ *     tags: [Sessions]
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - session_id
+ *               - paused_by
+ *             properties:
+ *               session_id:
+ *                 type: string
+ *               paused_by:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Session paused successfully
+ *       404:
+ *         description: Session not found
+ */
 router.post('/pause', requireAuth, validateBody(pauseSessionSchema), async (req: Request, res: Response) => {
   try {
     const { session_id, paused_by } = req.body;
@@ -77,6 +133,31 @@ router.post('/pause', requireAuth, validateBody(pauseSessionSchema), async (req:
   }
 });
 
+/**
+ * @swagger
+ * /sessions/resume:
+ *   post:
+ *     summary: Resume a paused tracking session
+ *     tags: [Sessions]
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - session_id
+ *             properties:
+ *               session_id:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Session resumed successfully
+ *       404:
+ *         description: Session not found
+ */
 router.post('/resume', requireAuth, validateBody(resumeSessionSchema), async (req: Request, res: Response) => {
   try {
     const { session_id } = req.body;
@@ -105,6 +186,31 @@ router.post('/resume', requireAuth, validateBody(resumeSessionSchema), async (re
   }
 });
 
+/**
+ * @swagger
+ * /sessions/stop:
+ *   post:
+ *     summary: Stop an active tracking session
+ *     tags: [Sessions]
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - session_id
+ *             properties:
+ *               session_id:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Session stopped successfully
+ *       404:
+ *         description: Session not found
+ */
 router.post('/stop', requireAuth, validateBody(stopSessionSchema), async (req: Request, res: Response) => {
   try {
     const { session_id } = req.body;

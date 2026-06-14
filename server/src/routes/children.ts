@@ -7,6 +7,20 @@ import { createChildSchema, updateChildSchema, pairSchema } from '../utils/schem
 
 const router = Router();
 
+/**
+ * @swagger
+ * /children:
+ *   get:
+ *     summary: Get all children profiles for the authenticated parent
+ *     tags: [Children]
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: List of children profiles
+ *       401:
+ *         description: Unauthorized
+ */
 router.get('/', requireAuth, requireRole('parent', 'guardian'), async (req: Request, res: Response) => {
   try {
     const result = await query(
@@ -27,6 +41,26 @@ router.get('/', requireAuth, requireRole('parent', 'guardian'), async (req: Requ
   }
 });
 
+/**
+ * @swagger
+ * /children/{id}:
+ *   get:
+ *     summary: Get a specific child profile by ID
+ *     tags: [Children]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Child profile data
+ *       404:
+ *         description: Child not found
+ */
 router.get('/:id', requireAuth, requireRole('parent', 'guardian'), async (req: Request, res: Response) => {
   try {
     const result = await query(
@@ -41,6 +75,35 @@ router.get('/:id', requireAuth, requireRole('parent', 'guardian'), async (req: R
   }
 });
 
+/**
+ * @swagger
+ * /children:
+ *   post:
+ *     summary: Create a new child profile
+ *     tags: [Children]
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *             properties:
+ *               name:
+ *                 type: string
+ *               photo_url:
+ *                 type: string
+ *               indicator_style:
+ *                 type: string
+ *               update_interval_s:
+ *                 type: integer
+ *     responses:
+ *       201:
+ *         description: Child profile created
+ */
 router.post('/', requireAuth, requireRole('parent', 'guardian'), validateBody(createChildSchema), async (req: Request, res: Response) => {
   try {
     const { name, photo_url, indicator_style, update_interval_s } = req.body;
@@ -57,6 +120,41 @@ router.post('/', requireAuth, requireRole('parent', 'guardian'), validateBody(cr
   }
 });
 
+/**
+ * @swagger
+ * /children/{id}:
+ *   put:
+ *     summary: Update an existing child profile
+ *     tags: [Children]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               photo_url:
+ *                 type: string
+ *               indicator_style:
+ *                 type: string
+ *               update_interval_s:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Child profile updated
+ *       404:
+ *         description: Child not found
+ */
 router.put('/:id', requireAuth, requireRole('parent', 'guardian'), validateBody(updateChildSchema), async (req: Request, res: Response) => {
   try {
     const existing = await query('SELECT id FROM child_profiles WHERE id = $1 AND parent_id = $2', [req.params.id, req.user!.id]);
@@ -86,6 +184,26 @@ router.put('/:id', requireAuth, requireRole('parent', 'guardian'), validateBody(
   }
 });
 
+/**
+ * @swagger
+ * /children/{id}:
+ *   delete:
+ *     summary: Delete a child profile
+ *     tags: [Children]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Successfully deleted
+ *       404:
+ *         description: Child not found
+ */
 router.delete('/:id', requireAuth, requireRole('parent', 'guardian'), async (req: Request, res: Response) => {
   try {
     const result = await query('DELETE FROM child_profiles WHERE id = $1 AND parent_id = $2 RETURNING id', [req.params.id, req.user!.id]);
@@ -97,6 +215,24 @@ router.delete('/:id', requireAuth, requireRole('parent', 'guardian'), async (req
   }
 });
 
+/**
+ * @swagger
+ * /children/{id}/pair:
+ *   post:
+ *     summary: Generate a new pairing token for a child
+ *     tags: [Children]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: New pairing token generated
+ */
 router.post('/:id/pair', requireAuth, requireRole('parent', 'guardian'), async (req: Request, res: Response) => {
   try {
     const existing = await query('SELECT id FROM child_profiles WHERE id = $1 AND parent_id = $2', [req.params.id, req.user!.id]);
@@ -111,6 +247,31 @@ router.post('/:id/pair', requireAuth, requireRole('parent', 'guardian'), async (
   }
 });
 
+/**
+ * @swagger
+ * /children/pair:
+ *   post:
+ *     summary: Pair a tracker device to a child profile using a token
+ *     tags: [Children]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *             properties:
+ *               token:
+ *                 type: string
+ *               child_user_name:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Successfully paired
+ *       404:
+ *         description: Invalid pairing token
+ */
 // Child pairs using token (public endpoint, rate-limited)
 router.post('/pair', validateBody(pairSchema), async (req: Request, res: Response) => {
   try {

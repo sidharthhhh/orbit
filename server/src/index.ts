@@ -20,6 +20,7 @@ import ipGeolocationRoutes from './routes/ipGeolocation.js';
 import discreetSosRoutes from './routes/discreetSos.js';
 import advancedRoutes from './routes/advanced.js';
 import monitoringRoutes from './routes/monitoring.js';
+import { setupSwagger } from './swagger.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -78,6 +79,8 @@ app.use('/api/monitoring', trackerCors, monitoringRoutes);
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
 });
+
+setupSwagger(app);
 
 initSocket(httpServer);
 startScheduledJobs();

@@ -6,6 +6,26 @@ import { createContactSchema, updateContactSchema } from '../utils/schemas.js';
 
 const router = Router();
 
+/**
+ * @swagger
+ * /contacts:
+ *   get:
+ *     summary: Get trusted contacts for a child
+ *     tags: [Contacts]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: child_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: List of trusted contacts
+ *       404:
+ *         description: Child not found
+ */
 router.get('/', requireAuth, requireRole('parent', 'guardian'), async (req: Request, res: Response) => {
   try {
     const childId = req.query.child_id;
@@ -20,6 +40,45 @@ router.get('/', requireAuth, requireRole('parent', 'guardian'), async (req: Requ
   }
 });
 
+/**
+ * @swagger
+ * /contacts:
+ *   post:
+ *     summary: Add a new trusted contact
+ *     tags: [Contacts]
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - child_id
+ *               - name
+ *               - priority
+ *             properties:
+ *               child_id:
+ *                 type: integer
+ *               name:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               relationship:
+ *                 type: string
+ *               priority:
+ *                 type: integer
+ *               notify_on:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       201:
+ *         description: Trusted contact created
+ */
 router.post('/', requireAuth, requireRole('parent', 'guardian'), validateBody(createContactSchema), async (req: Request, res: Response) => {
   try {
     const { child_id, name, phone, email, relationship, priority, notify_on } = req.body;
@@ -37,6 +96,47 @@ router.post('/', requireAuth, requireRole('parent', 'guardian'), validateBody(cr
   }
 });
 
+/**
+ * @swagger
+ * /contacts/{id}:
+ *   put:
+ *     summary: Update a trusted contact
+ *     tags: [Contacts]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               relationship:
+ *                 type: string
+ *               priority:
+ *                 type: integer
+ *               notify_on:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: Trusted contact updated
+ *       404:
+ *         description: Contact not found
+ */
 router.put('/:id', requireAuth, requireRole('parent', 'guardian'), validateBody(updateContactSchema), async (req: Request, res: Response) => {
   try {
     const contact = await query(
@@ -66,6 +166,26 @@ router.put('/:id', requireAuth, requireRole('parent', 'guardian'), validateBody(
   }
 });
 
+/**
+ * @swagger
+ * /contacts/{id}:
+ *   delete:
+ *     summary: Delete a trusted contact
+ *     tags: [Contacts]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Contact deleted successfully
+ *       404:
+ *         description: Contact not found
+ */
 router.delete('/:id', requireAuth, requireRole('parent', 'guardian'), async (req: Request, res: Response) => {
   try {
     const result = await query(

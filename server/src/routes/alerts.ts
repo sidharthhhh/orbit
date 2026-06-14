@@ -16,6 +16,34 @@ const sosSchema = z.object({
   lng: z.number().optional(),
 });
 
+/**
+ * @swagger
+ * /alerts/sos:
+ *   post:
+ *     summary: Trigger an SOS alert from the tracker
+ *     tags: [Alerts]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - session_id
+ *               - child_id
+ *             properties:
+ *               session_id:
+ *                 type: string
+ *               child_id:
+ *                 type: integer
+ *               lat:
+ *                 type: number
+ *               lng:
+ *                 type: number
+ *     responses:
+ *       201:
+ *         description: SOS alert created
+ */
 router.post('/sos', rateLimit({ windowMs: 60_000, max: 5, name: 'sos' }), validateBody(sosSchema), async (req: Request, res: Response) => {
   try {
     const { session_id, child_id, lat, lng } = req.body;
@@ -27,6 +55,27 @@ router.post('/sos', rateLimit({ windowMs: 60_000, max: 5, name: 'sos' }), valida
   }
 });
 
+/**
+ * @swagger
+ * /alerts:
+ *   get:
+ *     summary: Get alerts for children
+ *     tags: [Alerts]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: child_id
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: unresolved
+ *         schema:
+ *           type: boolean
+ *     responses:
+ *       200:
+ *         description: List of alerts
+ */
 router.get('/', requireAuth, async (req: Request, res: Response) => {
   try {
     const childId = req.query.child_id;
@@ -49,6 +98,37 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * @swagger
+ * /alerts/{id}/resolve:
+ *   put:
+ *     summary: Resolve an alert
+ *     tags: [Alerts]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - resolved_by
+ *             properties:
+ *               resolved_by:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Alert resolved
+ *       404:
+ *         description: Alert not found
+ */
 router.put('/:id/resolve', requireAuth, validateBody(resolveAlertSchema), async (req: Request, res: Response) => {
   try {
     const { resolved_by } = req.body;

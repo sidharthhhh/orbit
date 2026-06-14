@@ -6,6 +6,26 @@ import { createGeofenceSchema, updateGeofenceSchema } from '../utils/schemas.js'
 
 const router = Router();
 
+/**
+ * @swagger
+ * /geofences:
+ *   get:
+ *     summary: Get all geofences for a specific child
+ *     tags: [Geofences]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: child_id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: List of geofences
+ *       404:
+ *         description: Child not found
+ */
 router.get('/', requireAuth, requireRole('parent', 'guardian'), async (req: Request, res: Response) => {
   try {
     const childId = req.query.child_id;
@@ -20,6 +40,48 @@ router.get('/', requireAuth, requireRole('parent', 'guardian'), async (req: Requ
   }
 });
 
+/**
+ * @swagger
+ * /geofences:
+ *   post:
+ *     summary: Create a new geofence
+ *     tags: [Geofences]
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - child_id
+ *               - name
+ *               - latitude
+ *               - longitude
+ *               - radius_m
+ *               - is_safe
+ *             properties:
+ *               child_id:
+ *                 type: integer
+ *               name:
+ *                 type: string
+ *               latitude:
+ *                 type: number
+ *               longitude:
+ *                 type: number
+ *               radius_m:
+ *                 type: number
+ *               is_safe:
+ *                 type: boolean
+ *               schedule_json:
+ *                 type: object
+ *     responses:
+ *       201:
+ *         description: Geofence created
+ *       404:
+ *         description: Child not found
+ */
 router.post('/', requireAuth, requireRole('parent', 'guardian'), validateBody(createGeofenceSchema), async (req: Request, res: Response) => {
   try {
     const { child_id, name, latitude, longitude, radius_m, is_safe, schedule_json } = req.body;
@@ -37,6 +99,45 @@ router.post('/', requireAuth, requireRole('parent', 'guardian'), validateBody(cr
   }
 });
 
+/**
+ * @swagger
+ * /geofences/{id}:
+ *   put:
+ *     summary: Update an existing geofence
+ *     tags: [Geofences]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               latitude:
+ *                 type: number
+ *               longitude:
+ *                 type: number
+ *               radius_m:
+ *                 type: number
+ *               is_safe:
+ *                 type: boolean
+ *               schedule_json:
+ *                 type: object
+ *     responses:
+ *       200:
+ *         description: Geofence updated
+ *       404:
+ *         description: Geofence not found
+ */
 router.put('/:id', requireAuth, requireRole('parent', 'guardian'), validateBody(updateGeofenceSchema), async (req: Request, res: Response) => {
   try {
     const existing = await query('SELECT id FROM geofences WHERE id = $1 AND parent_id = $2', [req.params.id, req.user!.id]);
@@ -62,6 +163,26 @@ router.put('/:id', requireAuth, requireRole('parent', 'guardian'), validateBody(
   }
 });
 
+/**
+ * @swagger
+ * /geofences/{id}:
+ *   delete:
+ *     summary: Delete a geofence
+ *     tags: [Geofences]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Geofence deleted successfully
+ *       404:
+ *         description: Geofence not found
+ */
 router.delete('/:id', requireAuth, requireRole('parent', 'guardian'), async (req: Request, res: Response) => {
   try {
     const result = await query('DELETE FROM geofences WHERE id = $1 AND parent_id = $2 RETURNING id', [req.params.id, req.user!.id]);
