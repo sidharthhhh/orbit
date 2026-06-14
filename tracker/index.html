@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SafeTrack - Location Sharing</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:#0f172a;color:white;min-height:100vh;overflow-x:hidden}
+
+    .consent-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center;z-index:1000;padding:1rem}
+    .consent-overlay.hidden{display:none}
+    .consent-card{background:white;color:#1e293b;padding:1.5rem;border-radius:1.25rem;max-width:420px;width:100%;box-shadow:0 25px 50px -12px rgba(0,0,0,.5);animation:slideUp .4s ease}
+    .consent-card h2{font-size:1.25rem;font-weight:700;margin-bottom:.5rem}
+    .consent-card .sub{font-size:.875rem;color:#64748b;line-height:1.5}
+    .consent-card ul{margin:.75rem 0;padding-left:1.25rem;list-style:none}
+    .consent-card li{font-size:.85rem;color:#475569;padding:.35rem 0;display:flex;align-items:center;gap:.5rem}
+    .consent-card li::before{content:'';width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0}
+    .consent-card .note{font-size:.8rem;color:#94a3b8;margin-top:.75rem;padding:.75rem;background:#f1f5f9;border-radius:.5rem}
+    .consent-card .btn-row{display:flex;gap:.75rem;margin-top:1.25rem}
+    .consent-card .btn-share{flex:1;background:linear-gradient(135deg,#22c55e,#16a34a);color:white;border:none;padding:.85rem;border-radius:.75rem;font-weight:600;cursor:pointer;font-size:.95rem;transition:transform .15s,box-shadow .15s}
+    .consent-card .btn-share:active{transform:scale(.97)}
+    .consent-card .btn-not-now{flex:1;background:#e2e8f0;color:#475569;border:none;padding:.85rem;border-radius:.75rem;font-weight:600;cursor:pointer;font-size:.95rem;transition:background .15s}
+    .consent-card .btn-not-now:hover{background:#cbd5e1}
+
+    .indicator-banner{position:fixed;top:0;left:0;right:0;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:white;padding:.6rem .75rem;z-index:999;display:none;box-shadow:0 4px 20px rgba(37,99,235,.4);transition:transform .3s ease}
+    .indicator-banner.active{display:block;animation:slideDown .3s ease}
+    .banner-header{display:flex;align-items:center;justify-content:space-between}
+    .banner-left{display:flex;align-items:center;gap:.5rem}
+    .banner-left .dot{width:8px;height:8px;background:#4ade80;border-radius:50%;animation:pulse 2s infinite}
+    .banner-text{font-size:.8rem;font-weight:500}
+    .banner-controls{display:flex;gap:.4rem}
+    .banner-controls button{border:none;padding:.3rem .7rem;border-radius:.4rem;font-size:.7rem;font-weight:600;cursor:pointer;transition:opacity .15s}
+    .btn-pause{background:#f59e0b;color:white}
+    .btn-stop{background:#ef4444;color:white}
+    .btn-pause:active,.btn-stop:active{opacity:.8}
+    .mini-map{height:100px;margin-top:.5rem;border-radius:.5rem;overflow:hidden;border:1px solid rgba(255,255,255,.15)}
+
+    .indicator-badge{position:fixed;top:1rem;right:1rem;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:white;padding:.6rem 1rem;border-radius:1rem;z-index:999;display:none;box-shadow:0 4px 16px rgba(37,99,235,.4);align-items:center;gap:.5rem;font-size:.8rem;font-weight:500}
+    .indicator-badge.active{display:flex;animation:slideDown .3s ease}
+    .indicator-badge .pulse-dot{width:10px;height:10px;background:#4ade80;border-radius:50%;animation:pulse 2s infinite}
+
+    .ip-warning{position:fixed;top:3.5rem;left:.5rem;right:.5rem;background:linear-gradient(135deg,#92400e,#d97706);color:white;padding:.75rem 1rem;border-radius:.75rem;z-index:998;display:none;box-shadow:0 4px 16px rgba(217,119,6,.3);font-size:.8rem;animation:slideUp .3s ease}
+    .ip-warning.active{display:block}
+    .ip-warning .ip-header{font-weight:600;margin-bottom:.3rem;display:flex;align-items:center;gap:.4rem}
+    .ip-warning .ip-text{opacity:.9;line-height:1.4}
+    .ip-warning .ip-dismiss{background:rgba(255,255,255,.2);border:none;color:white;padding:.25rem .6rem;border-radius:.35rem;font-size:.7rem;cursor:pointer;margin-top:.4rem}
+
+    .ip-consent{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:1002;padding:1.5rem}
+    .ip-consent.active{display:flex}
+    .ip-consent-card{background:#1e293b;color:white;padding:1.5rem;border-radius:1rem;max-width:360px;width:100%;border:2px solid #d97706;animation:slideUp .3s ease}
+    .ip-consent-card h2{font-size:1.1rem;font-weight:700;color:#f59e0b;margin-bottom:.75rem}
+    .ip-consent-card ul{margin:.75rem 0;padding-left:1rem;list-style:none}
+    .ip-consent-card li{font-size:.8rem;color:#94a3b8;padding:.3rem 0}
+    .ip-consent-card .warn-box{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);padding:.6rem;border-radius:.5rem;margin:.75rem 0;font-size:.75rem;color:#fbbf24}
+    .ip-consent-card .btn-row{display:flex;gap:.5rem;margin-top:1rem}
+    .ip-consent-card .btn-use{flex:1;background:#d97706;color:white;border:none;padding:.75rem;border-radius:.5rem;font-weight:600;cursor:pointer}
+    .ip-consent-card .btn-skip{flex:1;background:#475569;color:white;border:none;padding:.75rem;border-radius:.5rem;font-weight:600;cursor:pointer}
+
+    .source-badge{position:fixed;bottom:5.5rem;left:.75rem;background:rgba(15,23,42,.9);backdrop-filter:blur(8px);color:white;padding:.4rem .7rem;border-radius:.5rem;z-index:996;display:none;font-size:.7rem;align-items:center;gap:.4rem;border:1px solid rgba(255,255,255,.1)}
+    .source-badge.active{display:flex}
+    .source-badge .s-dot{width:7px;height:7px;border-radius:50%}
+    .source-badge .s-dot.gps{background:#4ade80}
+    .source-badge .s-dot.ip{background:#f59e0b}
+    .source-badge .s-dot.network{background:#60a5fa}
+
+    .status-toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(15,23,42,.95);backdrop-filter:blur(8px);color:white;padding:.85rem 1.5rem;border-radius:.75rem;z-index:1001;display:none;border:1px solid rgba(255,255,255,.1);font-size:.85rem;white-space:nowrap}
+    .status-toast.show{display:block;animation:fadeInOut 3s ease-in-out}
+
+    .sos-container{position:fixed;bottom:5.5rem;right:.75rem;z-index:998}
+    .btn-sos{width:56px;height:56px;background:linear-gradient(135deg,#dc2626,#b91c1c);color:white;border:3px solid #fca5a5;border-radius:50%;font-weight:700;font-size:.9rem;cursor:pointer;box-shadow:0 0 20px rgba(220,38,38,.4);display:none;transition:transform .15s}
+    .btn-sos.active{display:block}
+    .btn-sos:active{transform:scale(.9)}
+
+    .controls-bar{position:fixed;bottom:.75rem;left:.75rem;right:4.5rem;z-index:998;display:none;gap:.5rem}
+    .controls-bar.active{display:flex}
+    .controls-bar .btn{flex:1;padding:.7rem;border:none;border-radius:.6rem;font-weight:600;cursor:pointer;font-size:.8rem;transition:opacity .15s}
+    .controls-bar .btn:active{opacity:.8}
+    .btn-pause-ctrl{background:linear-gradient(135deg,#f59e0b,#d97706);color:white}
+    .btn-resume-ctrl{background:linear-gradient(135deg,#22c55e,#16a34a);color:white}
+    .btn-stop-ctrl{background:linear-gradient(135deg,#ef4444,#dc2626);color:white}
+
+    .permission-denied{position:fixed;inset:0;background:#0f172a;display:none;align-items:center;justify-content:center;z-index:1000;padding:2rem}
+    .permission-denied.active{display:flex}
+    .permission-denied .card{background:#1e293b;padding:2rem;border-radius:1rem;text-align:center;max-width:320px;animation:slideUp .3s ease}
+    .permission-denied h2{margin-bottom:.75rem;font-size:1.2rem}
+    .permission-denied p{color:#94a3b8;font-size:.85rem;line-height:1.5}
+
+    /* Discreet SOS */
+    .discreet-trigger{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:995;display:none}
+    .discreet-trigger.active{display:block}
+    .discreet-btn{width:100px;height:100px;background:transparent;border:none;cursor:pointer;position:relative}
+    .discreet-btn .ring{position:absolute;inset:0;border:2px dashed rgba(255,255,255,.08);border-radius:50%;animation:spin 20s linear infinite}
+    .discreet-btn .inner{position:absolute;inset:20px;background:rgba(255,255,255,.03);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.5rem}
+    .discreet-active-banner{position:fixed;top:0;left:0;right:0;background:linear-gradient(135deg,#7c2d12,#dc2626);color:white;padding:.5rem .75rem;z-index:1003;display:none;font-size:.75rem;text-align:center;animation:pulse 2s infinite}
+    .discreet-active-banner.active{display:block}
+
+    /* Consent reconfirmation */
+    .consent-reconfirm{position:fixed;bottom:4rem;left:1rem;right:1rem;background:rgba(15,23,42,.95);backdrop-filter:blur(12px);color:white;padding:1rem;border-radius:.75rem;z-index:1004;display:none;border:1px solid rgba(255,255,255,.1);animation:slideUp .3s ease}
+    .consent-reconfirm.active{display:block}
+    .consent-reconfirm h3{font-size:.9rem;font-weight:600;margin-bottom:.5rem}
+    .consent-reconfirm .btn-row{display:flex;gap:.5rem;margin-top:.75rem}
+    .consent-reconfirm .btn-yes{flex:1;background:#22c55e;color:white;border:none;padding:.6rem;border-radius:.5rem;font-weight:600;cursor:pointer}
+    .consent-reconfirm .btn-no{flex:1;background:#475569;color:white;border:none;padding:.6rem;border-radius:.5rem;font-weight:600;cursor:pointer}
+
+    /* Pickup confirmation */
+    .pickup-card{position:fixed;bottom:4rem;left:1rem;right:1rem;background:white;color:#1e293b;padding:1.25rem;border-radius:1rem;z-index:1004;display:none;box-shadow:0 20px 40px rgba(0,0,0,.5);animation:slideUp .3s ease}
+    .pickup-card.active{display:block}
+    .pickup-card h3{font-size:1rem;font-weight:700;margin-bottom:.5rem}
+    .pickup-card p{font-size:.85rem;color:#64748b;margin-bottom:.75rem}
+    .pickup-card .btn-confirm{width:100%;background:#22c55e;color:white;border:none;padding:.75rem;border-radius:.5rem;font-weight:600;cursor:pointer}
+
+    /* Ping received */
+    .ping-toast{position:fixed;top:4rem;left:1rem;right:1rem;background:linear-gradient(135deg,#7c3aed,#a78bfa);color:white;padding:.85rem 1rem;border-radius:.75rem;z-index:1004;display:none;animation:slideDown .3s ease;font-size:.85rem}
+    .ping-toast.active{display:block}
+    .ping-toast .ping-msg{font-weight:500}
+    .ping-toast .ping-from{font-size:.7rem;opacity:.7;margin-top:.2rem}
+
+    /* Pairing Overlay */
+    .pairing-overlay{position:fixed;inset:0;background:#0f172a;display:flex;align-items:center;justify-content:center;z-index:2000;padding:1.5rem}
+    .pairing-overlay.hidden{display:none}
+    .pairing-card{background:#1e293b;padding:2rem;border-radius:1.5rem;width:100%;max-width:380px;text-align:center;box-shadow:0 25px 50px -12px rgba(0,0,0,.5);animation:slideUp .4s ease}
+    .pairing-card h2{font-size:1.5rem;font-weight:700;margin-bottom:.5rem;color:white}
+    .pairing-card p{color:#94a3b8;font-size:.9rem;margin-bottom:1.5rem;line-height:1.5}
+    .pairing-input{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:white;padding:1rem;border-radius:.75rem;font-size:1.2rem;text-align:center;letter-spacing:2px;font-family:monospace;margin-bottom:1.5rem;transition:border .2s}
+    .pairing-input:focus{outline:none;border-color:#3b82f6}
+    .pairing-btn{width:100%;background:linear-gradient(135deg,#3b82f6,#2563eb);color:white;border:none;padding:1rem;border-radius:.75rem;font-weight:600;font-size:1rem;cursor:pointer;transition:transform .15s}
+    .pairing-btn:active{transform:scale(.98)}
+    .pairing-btn:disabled{opacity:0.5;cursor:not-allowed}
+
+    @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes slideDown{from{opacity:0;transform:translateY(-100%)}to{opacity:1;transform:translateY(0)}}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+    @keyframes fadeInOut{0%{opacity:0}10%{opacity:1}90%{opacity:1}100%{opacity:0}}
+    @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+    @media(prefers-reduced-motion:reduce){
+      .indicator-badge .pulse-dot,.indicator-banner .dot{animation:none}
+      .consent-card,.ip-consent-card,.ip-warning,.indicator-banner,.indicator-badge{animation:none}
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Pairing Overlay -->
+  <div id="pairingOverlay" class="pairing-overlay hidden">
+    <div class="pairing-card">
+      <div style="font-size:3rem;margin-bottom:1rem">📱</div>
+      <h2>Pair Device</h2>
+      <p>Enter the pairing token from the Parent Dashboard to link this device.</p>
+      <input type="text" id="pairingToken" class="pairing-input" placeholder="e.g. 5f4e3d" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" />
+      <button id="btnPair" class="pairing-btn" onclick="pairDevice()">Pair Device</button>
+    </div>
+  </div>
+
+  <!-- Waiting Overlay -->
+  <div id="waitingOverlay" class="pairing-overlay hidden" style="z-index: 1500; background: rgba(15,23,42,0.95);">
+    <div style="text-align:center; animation:pulse 2s infinite">
+      <div style="font-size:3rem;margin-bottom:1rem">⏳</div>
+      <h2 style="font-size:1.2rem;font-weight:600;color:white;">Waiting for Parent...</h2>
+      <p style="color:#94a3b8;font-size:.9rem;margin-top:.5rem">Your device is paired.<br>Waiting for your parent to start tracking.</p>
+    </div>
+  </div>
+
+  <!-- Consent Card -->
+  <div id="consentOverlay" class="consent-overlay hidden">
+    <div class="consent-card">
+      <h2>Hi there! 👋</h2>
+      <p class="sub">Your parent wants to keep you safe. Tap below to share:</p>
+      <ul>
+        <li>Your live location</li>
+        <li>Battery level & charging status</li>
+        <li>Network type (WiFi/4G/Offline)</li>
+        <li>Timezone & screen info</li>
+      </ul>
+      <div class="note">You can stop sharing anytime by tapping <strong>Pause</strong> or <strong>Stop</strong>.</div>
+      <div class="btn-row">
+        <button class="btn-share" onclick="startTracking()">Share My Location ✅</button>
+        <button class="btn-not-now" onclick="dismiss()">Not Now</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Permission Denied -->
+  <div id="permissionDenied" class="permission-denied">
+    <div class="card">
+      <h2>No problem! 😊</h2>
+      <p>Your parent won't see your location. You can change this in your browser settings if you want to share later.</p>
+    </div>
+  </div>
+
+  <!-- IP Consent -->
+  <div id="ipConsent" class="ip-consent">
+    <div class="ip-consent-card">
+      <h2>📍 Use IP Location?</h2>
+      <p style="font-size:.85rem;color:#94a3b8">GPS is not available. We can estimate your location using your IP address.</p>
+      <ul>
+        <li>🌐 Approximate (city-level, ~5km)</li>
+        <li>📍 Less precise than GPS</li>
+        <li>👁️ Parent will see this is IP-based</li>
+      </ul>
+      <div class="warn-box">⚠️ Your parent will be notified this location is approximate.</div>
+      <div class="btn-row">
+        <button class="btn-use" onclick="useIPLocation()">Use IP Location</button>
+        <button class="btn-skip" onclick="skipIPLocation()">Skip</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Banner Indicator -->
+  <div id="indicatorBanner" class="indicator-banner">
+    <div class="banner-header">
+      <div class="banner-left">
+        <div class="dot"></div>
+        <span class="banner-text">📍 Location sharing is ON</span>
+      </div>
+      <div class="banner-controls">
+        <button class="btn-pause" onclick="pauseTracking()">Pause</button>
+        <button class="btn-stop" onclick="stopTracking()">Stop</button>
+      </div>
+    </div>
+    <div id="miniMap" class="mini-map"></div>
+  </div>
+
+  <!-- Badge Indicator -->
+  <div id="indicatorBadge" class="indicator-badge">
+    <div class="pulse-dot"></div>
+    <span>📍 Sharing Location</span>
+  </div>
+
+  <!-- IP Warning -->
+  <div id="ipWarning" class="ip-warning">
+    <div class="ip-header">⚠️ Approximate Location (IP-Based)</div>
+    <div class="ip-text">Location estimated from IP address. Accuracy: ~5km radius. Your parent can see this is approximate.</div>
+    <button class="ip-dismiss" onclick="dismissIPWarning()">Got it</button>
+  </div>
+
+  <!-- Source Badge -->
+  <div id="sourceBadge" class="source-badge">
+    <div class="s-dot gps" id="sourceDot"></div>
+    <span id="sourceText">GPS</span>
+  </div>
+
+  <!-- Status Toast -->
+  <div id="statusToast" class="status-toast"></div>
+
+  <!-- Discreet SOS Trigger (invisible, long-press on SOS) -->
+  <div id="discreetTrigger" class="discreet-trigger">
+    <button class="discreet-btn" onclick="activateDiscreetSOS()">
+      <div class="ring"></div>
+      <div class="inner">🤫</div>
+    </button>
+  </div>
+
+  <!-- Discreet Active Banner -->
+  <div id="discreetBanner" class="discreet-active-banner">
+    🔴 Discreet mode active — location still transmitting silently
+  </div>
+
+  <!-- Consent Reconfirmation -->
+  <div id="consentReconfirm" class="consent-reconfirm">
+    <h3>📍 Still sharing location</h3>
+    <p style="font-size:.8rem;color:#94a3b8">Your parent wants to confirm: are you still OK sharing?</p>
+    <div class="btn-row">
+      <button class="btn-yes" onclick="confirmConsent(true)">Yes, keep sharing</button>
+      <button class="btn-no" onclick="confirmConsent(false)">Stop sharing</button>
+    </div>
+  </div>
+
+  <!-- Pickup Confirmation -->
+  <div id="pickupCard" class="pickup-card">
+    <h3 id="pickupTitle">🚗 Pickup Assigned</h3>
+    <p id="pickupPerson"></p>
+    <button class="btn-confirm" onclick="confirmPickup()">Confirm Pickup ✅</button>
+  </div>
+
+  <!-- Ping Toast -->
+  <div id="pingToast" class="ping-toast">
+    <div class="ping-msg" id="pingMsg">💬 Thinking of you!</div>
+    <div class="ping-from" id="pingFrom">from your parent</div>
+  </div>
+
+  <!-- SOS -->
+  <div class="sos-container">
+    <button id="btnSos" class="btn-sos" onclick="triggerSOS()">SOS</button>
+  </div>
+
+  <!-- Controls -->
+  <div id="controls" class="controls-bar">
+    <button id="btnPauseCtrl" class="btn btn-pause-ctrl" onclick="pauseTracking()">Pause</button>
+    <button id="btnStopCtrl" class="btn btn-stop-ctrl" onclick="stopTracking()">Stop</button>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const API = window.SAFETRACK_API || 'http://localhost:3001';
+    let CHILD_ID = parseInt(localStorage.getItem('SAFETRACK_CHILD_ID')) || window.SAFETRACK_CHILD_ID || 0;
+    let SESSION_ID = '';
+    let STYLE = localStorage.getItem('SAFETRACK_INDICATOR') || window.SAFETRACK_INDICATOR || 'banner_map';
+    const INTERVAL = (window.SAFETRACK_INTERVAL || 10) * 1000;
+
+    let watchId=null,timer=null,tracking=false,paused=false;
+    let lat=null,lng=null,accuracy=null;
+    let miniMap=null,miniMarker=null;
+    let battery=null,charging=null,netType=null,tz=null;
+    let queue=[],locSource='gps',ipUsed=false,gpsOk=false;
+
+    function getDeviceInfo(){
+      tz=Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const c=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+      netType=c?c.effectiveType||c.type||'unknown':'unknown';
+      if(!navigator.onLine)netType='offline';
+    }
+
+    async function pairDevice() {
+      const token = document.getElementById('pairingToken').value.trim();
+      if (!token) return toast('Please enter a token');
+      
+      const btn = document.getElementById('btnPair');
+      btn.disabled = true;
+      btn.textContent = 'Pairing...';
+      
+      try {
+        const r = await fetch(`${API}/api/children/pair`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ token, child_user_name: 'Tracker Device' })
+        });
+        
+        const data = await r.json();
+        if (r.ok) {
+          CHILD_ID = data.child_id;
+          localStorage.setItem('SAFETRACK_CHILD_ID', CHILD_ID);
+          toast('Device paired successfully!');
+          document.getElementById('pairingOverlay').classList.add('hidden');
+          initApp();
+        } else {
+          toast(data.error || 'Pairing failed');
+          btn.disabled = false;
+          btn.textContent = 'Pair Device';
+        }
+      } catch (err) {
+        toast('Network error. Try again.');
+        btn.disabled = false;
+        btn.textContent = 'Pair Device';
+      }
+    }
+
+    function initApp() {
+      if (!CHILD_ID) {
+        document.getElementById('pairingOverlay').classList.remove('hidden');
+        document.getElementById('consentOverlay').classList.add('hidden');
+      } else {
+        document.getElementById('pairingOverlay').classList.add('hidden');
+        document.getElementById('consentOverlay').classList.add('hidden');
+        document.getElementById('waitingOverlay').classList.remove('hidden');
+        initSocketListeners();
+      }
+    }
+
+    async function getBattery(){
+      try{
+        if(navigator.getBattery){
+          const b=await navigator.getBattery();
+          battery=Math.round(b.level*100);charging=b.charging;
+          b.onlevelchange=()=>{battery=Math.round(b.level*100)};
+          b.onchargingchange=()=>{charging=b.charging};
+        }
+      }catch(e){}
+    }
+
+    function toast(msg){
+      const t=document.getElementById('statusToast');
+      t.textContent=msg;t.classList.remove('show');void t.offsetWidth;t.classList.add('show');
+      setTimeout(()=>t.classList.remove('show'),3000);
+    }
+
+    function showIndicator(){
+      document.getElementById('sourceBadge').classList.add('active');
+      document.getElementById('controls').classList.add('active');
+      document.getElementById('btnSos').classList.add('active');
+      if(STYLE==='banner_map'){
+        document.getElementById('indicatorBanner').classList.add('active');
+        if(lat&&lng)initMiniMap(lat,lng);
+      }else{
+        document.getElementById('indicatorBadge').classList.add('active');
+      }
+    }
+
+    function hideIndicator(){
+      document.getElementById('indicatorBanner').classList.remove('active');
+      document.getElementById('indicatorBadge').classList.remove('active');
+      document.getElementById('controls').classList.remove('active');
+      document.getElementById('btnSos').classList.remove('active');
+      document.getElementById('sourceBadge').classList.remove('active');
+      document.getElementById('ipWarning').classList.remove('active');
+    }
+
+    function updateSourceBadge(src){
+      const dot=document.getElementById('sourceDot');
+      const txt=document.getElementById('sourceText');
+      dot.className='s-dot '+src;
+      txt.textContent=src==='gps'?'GPS':src==='ip'?'IP Address':'Network';
+    }
+
+    function initMiniMap(a,b){
+      if(miniMap)return;
+      const el=document.getElementById('miniMap');if(!el)return;
+      miniMap=L.map(el,{zoomControl:false,attributionControl:false}).setView([a,b],15);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(miniMap);
+      const icon=L.divIcon({className:'m',html:'<div style="width:10px;height:10px;background:#3b82f6;border-radius:50%;border:2px solid white;box-shadow:0 0 8px rgba(59,130,246,.6)"></div>',iconSize:[10,10],iconAnchor:[5,5]});
+      miniMarker=L.marker([a,b],{icon}).addTo(miniMap);
+    }
+
+    async function sendLocation(a,b,acc,src){
+      src=src||'gps';
+      const payload={
+        session_id:SESSION_ID,latitude:a,longitude:b,accuracy_m:acc,
+        location_source:src,battery_level:battery,battery_charging:charging,
+        network_type:netType,is_online:navigator.onLine,timezone:tz,
+        screen_width:window.screen.width,screen_height:window.screen.height
+      };
+      try{
+        const r=await fetch(`${API}/api/locations`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),credentials:'include'});
+        if(!r.ok)throw new Error('fail');
+        while(queue.length){const q=queue.shift();await fetch(`${API}/api/locations`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(q),credentials:'include'});}
+      }catch(e){queue.push(payload);if(queue.length>50)queue.shift();}
+    }
+
+    function startGPS(){
+      if(!navigator.geolocation)return false;
+      watchId=navigator.geolocation.watchPosition(
+        p=>{
+          gpsOk=true;locSource='gps';
+          lat=p.coords.latitude;lng=p.coords.longitude;accuracy=p.coords.accuracy;
+          updateSourceBadge('gps');
+          if(!tracking){tracking=true;document.getElementById('consentOverlay').classList.add('hidden');showIndicator();logConsent('opt_in');toast('Location sharing started');}
+          if(paused)return;
+          sendLocation(lat,lng,accuracy,'gps');
+          if(miniMap&&miniMarker){miniMarker.setLatLng([lat,lng]);miniMap.setView([lat,lng]);}
+        },
+        e=>{
+          if(e.code===e.PERMISSION_DENIED){
+            document.getElementById('consentOverlay').classList.add('hidden');
+            document.getElementById('permissionDenied').classList.add('active');
+            logConsent('permission_denied');
+          }else if(!gpsOk){
+            offerIPLocation();
+          }
+        },
+        {enableHighAccuracy:true,maximumAge:5000,timeout:15000}
+      );
+      return true;
+    }
+
+    function offerIPLocation(){
+      document.getElementById('ipConsent').classList.add('active');
+    }
+
+    async function useIPLocation(){
+      document.getElementById('ipConsent').classList.remove('active');
+      locSource='ip';ipUsed=true;
+      updateSourceBadge('ip');
+      document.getElementById('ipWarning').classList.add('active');
+      if(!tracking){tracking=true;document.getElementById('consentOverlay').classList.add('hidden');showIndicator();logConsent('opt_in');toast('Location sharing started (IP-based)');}
+      try{
+        const r=await fetch(`${API}/api/ip-location/locate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:SESSION_ID,child_id:CHILD_ID}),credentials:'include'});
+        if(r.ok){
+          const d=await r.json();
+          if(d.location){lat=d.location.latitude;lng=d.location.longitude;accuracy=5000;
+            if(miniMap&&miniMarker){miniMarker.setLatLng([lat,lng]);miniMap.setView([lat,lng],12);}
+            if(!miniMap&&lat)initMiniMap(lat,lng);
+          }
+          toast('IP location: '+(d.city||'Unknown')+', '+(d.country||'Unknown'));
+        }
+      }catch(e){toast('IP location failed');}
+
+      timer=setInterval(()=>{
+        if(!paused){
+          fetch(`${API}/api/ip-location/locate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:SESSION_ID,child_id:CHILD_ID}),credentials:'include'})
+          .then(r=>r.json()).then(d=>{if(d.location){lat=d.location.latitude;lng=d.location.longitude;
+            if(miniMap&&miniMarker){miniMarker.setLatLng([lat,lng]);miniMap.setView([lat,lng]);}}
+          }).catch(()=>{});
+        }
+      },120000);
+    }
+
+    function skipIPLocation(){
+      document.getElementById('ipConsent').classList.remove('active');
+      if(!tracking){document.getElementById('consentOverlay').classList.remove('hidden');}
+      toast('IP location skipped');
+    }
+
+    function dismissIPWarning(){document.getElementById('ipWarning').classList.remove('active');}
+
+    async function startTracking(){
+      if(tracking)return;
+      await getBattery();getDeviceInfo();
+      if(!startGPS()){toast('Geolocation not supported');return;}
+
+      timer=setInterval(()=>{
+        updateNetworkStatus();
+        if(lat&&lng&&!paused&&gpsOk){
+          navigator.geolocation.getCurrentPosition(p=>{
+            lat=p.coords.latitude;lng=p.coords.longitude;accuracy=p.coords.accuracy;
+            sendLocation(lat,lng,accuracy,'gps');
+            if(miniMap&&miniMarker){miniMarker.setLatLng([lat,lng]);miniMap.setView([lat,lng]);}
+          },()=>{},{enableHighAccuracy:true});
+        }
+      },INTERVAL);
+
+      setTimeout(()=>{if(!gpsOk&&!ipUsed)offerIPLocation();},10000);
+
+      setInterval(()=>{
+        if(battery!==null&&battery<15&&tracking&&!paused){
+          if(timer){clearInterval(timer);
+            timer=setInterval(()=>{if(lat&&lng&&!paused)sendLocation(lat,lng,accuracy,locSource);},30000);
+          }
+        }
+      },60000);
+    }
+
+    function updateNetworkStatus(){
+      const c=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+      netType=c?c.effectiveType||c.type||'unknown':'unknown';
+      if(!navigator.onLine)netType='offline';
+    }
+
+    function pauseTracking(){
+      if(!tracking||paused)return;paused=true;
+      if(watchId){navigator.geolocation.clearWatch(watchId);watchId=null;}
+      toast('Location sharing paused');logConsent('pause');
+      const b=document.getElementById('btnPauseCtrl');
+      if(b){b.textContent='Resume';b.className='btn btn-resume-ctrl';b.onclick=resumeTracking;}
+    }
+
+    function resumeTracking(){
+      if(!tracking||!paused)return;paused=false;
+      if(gpsOk){
+        watchId=navigator.geolocation.watchPosition(p=>{
+          lat=p.coords.latitude;lng=p.coords.longitude;accuracy=p.coords.accuracy;
+          sendLocation(lat,lng,accuracy,'gps');
+          if(miniMap&&miniMarker){miniMarker.setLatLng([lat,lng]);miniMap.setView([lat,lng]);}
+        },()=>{},{enableHighAccuracy:true,maximumAge:5000,timeout:15000});
+      }
+      toast('Location sharing resumed');logConsent('resume');
+      const b=document.getElementById('btnPauseCtrl');
+      if(b){b.textContent='Pause';b.className='btn btn-pause-ctrl';b.onclick=pauseTracking;}
+    }
+
+    function stopTracking(){
+      if(!tracking)return;tracking=false;paused=false;
+      if(watchId){navigator.geolocation.clearWatch(watchId);watchId=null;}
+      if(timer){clearInterval(timer);timer=null;}
+      hideIndicator();
+      document.getElementById('consentOverlay').classList.add('hidden');
+      document.getElementById('waitingOverlay').classList.remove('hidden');
+      toast('Location sharing stopped');logConsent('stop');
+      fetch(`${API}/api/sessions/stop`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:SESSION_ID}),credentials:'include'}).catch(()=>{});
+      SESSION_ID = '';
+    }
+
+    function dismiss(){document.getElementById('consentOverlay').classList.add('hidden');}
+
+    function triggerSOS(){
+      if(!tracking)return;
+      fetch(`${API}/api/alerts/sos`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:SESSION_ID,child_id:CHILD_ID,lat,lng}),credentials:'include'}).catch(()=>{});
+      toast('🚨 SOS alert sent!');
+    }
+
+    // Discreet SOS
+    let discreetActive=false;
+    function activateDiscreetSOS(){
+      if(!tracking)return;
+      fetch(`${API}/api/discreet/discreet-sos`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({child_id:CHILD_ID,session_id:SESSION_ID,action:'fake_shutdown'}),credentials:'include'})
+      .then(()=>{discreetActive=true;document.getElementById('discreetBanner').classList.add('active');hideIndicator();toast('Discreet mode: location still transmitting');})
+      .catch(()=>{toast('Discreet SOS failed');});
+    }
+
+    // Consent reconfirmation
+    let pendingReconfirmSession=null;
+    function showConsentReconfirm(sessionId){
+      pendingReconfirmSession=sessionId;
+      document.getElementById('consentReconfirm').classList.add('active');
+    }
+    function confirmConsent(agree){
+      document.getElementById('consentReconfirm').classList.remove('active');
+      if(!agree){stopTracking();return;}
+      fetch(`${API}/api/consent/log`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({child_id:CHILD_ID,session_id:pendingReconfirmSession||SESSION_ID,event:'reconfirmation_ack',actor:'child'}),credentials:'include'}).catch(()=>{});
+      toast('Thanks! Sharing continues.');
+    }
+
+    // Pickup confirmation
+    let pendingPickupId=null;
+    function showPickupConfirmation(pickup){
+      pendingPickupId=pickup.id;
+      document.getElementById('pickupPerson').textContent=pickup.pickup_person+(pickup.pickup_person_contact?' · '+pickup.pickup_person_contact:'');
+      document.getElementById('pickupCard').classList.add('active');
+    }
+    function confirmPickup(){
+      if(!pendingPickupId)return;
+      fetch(`${API}/api/advanced/pickup/confirm`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pickup_id:pendingPickupId,lat,lng}),credentials:'include'})
+      .then(()=>{document.getElementById('pickupCard').classList.remove('active');toast('Pickup confirmed!');})
+      .catch(()=>{toast('Confirmation failed');});
+    }
+
+    // Ping received
+    function showPing(ping){
+      const t=document.getElementById('pingToast');
+      document.getElementById('pingMsg').textContent='💬 '+(ping.message||'Thinking of you!');
+      document.getElementById('pingFrom').textContent='from your '+ping.sender_role;
+      t.classList.add('active');
+      setTimeout(()=>t.classList.remove('active'),5000);
+      fetch(`${API}/api/advanced/ping/respond`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ping_id:ping.id}),credentials:'include'}).catch(()=>{});
+    }
+
+    function logConsent(event){
+      const m={};
+      if(battery!==null)m.battery_level=battery;
+      if(netType)m.network_type=netType;
+      if(tz)m.timezone=tz;
+      m.location_source=locSource;
+      fetch(`${API}/api/consent/log`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({child_id:CHILD_ID,session_id:SESSION_ID,event,actor:'child',metadata:m}),credentials:'include'}).catch(()=>{});
+    }
+
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&tracking)toast('Still sharing location');});
+    window.addEventListener('online',()=>{netType='unknown';toast('Back online');queue.forEach(q=>{fetch(`${API}/api/locations`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(q),credentials:'include'}).catch(()=>{});});queue=[];});
+    window.addEventListener('offline',()=>{netType='offline';toast('You are offline. Updates will be queued.');});
+
+    if(navigator.permissions){navigator.permissions.query({name:'geolocation'}).then(s=>{s.onchange=()=>{if(s.state==='denied'&&tracking){tracking=false;if(watchId)navigator.geolocation.clearWatch(watchId);if(timer)clearInterval(timer);hideIndicator();toast('Location access was revoked.');logConsent('permission_revoked');document.getElementById('consentOverlay').classList.remove('hidden');}};});}
+
+    getDeviceInfo();
+
+    // Socket listeners (if Socket.IO is available)
+    let socketInit = false;
+    function initSocketListeners(){
+      if(typeof io==='undefined' || !CHILD_ID || socketInit)return;
+      socketInit = true;
+      try{
+        const socket=io(API||window.location.origin,{
+          withCredentials:true,
+          auth: { child_id: CHILD_ID }
+        });
+        socket.on('connect',()=>{socket.emit('join:child',CHILD_ID);});
+        socket.on('session:started', d => {
+          SESSION_ID = d.session.session_id;
+          document.getElementById('waitingOverlay').classList.add('hidden');
+          document.getElementById('consentOverlay').classList.remove('hidden');
+          toast('Parent requested location');
+        });
+        socket.on('session:stopped', () => {
+          stopTracking();
+        });
+        socket.on('consent:reconfirm',d=>{showConsentReconfirm(d.session_id);});
+        socket.on('pickup:assigned',d=>{showPickupConfirmation(d.pickup);});
+        socket.on('ping:received',d=>{showPing(d.ping);});
+        socket.on('checkin:requested',d=>{
+          if(d.reason==='possible_incident')toast('⚠️ '+d.message);
+        });
+      }catch(e){console.log('Socket not available');}
+    }
+
+    // Load Socket.IO and init
+    if(typeof io==='undefined'){
+      const s=document.createElement('script');
+      s.src=(API||'http://localhost:3001') + '/socket.io/socket.io.js';
+      s.onload=()=>{ if(CHILD_ID) initSocketListeners(); };
+      document.head.appendChild(s);
+    }else{ if(CHILD_ID) initSocketListeners(); }
+
+    window.addEventListener('DOMContentLoaded', initApp);
+  </script>
+</body>
+</html>
